@@ -1,0 +1,35 @@
+#!/bin/bash
+# Script para exibir as dependências opcionais dos pacotes no Arch Linux
+
+coletar_optdeps() {
+    /usr/bin/expac -S "%o" "$@" | tr ' ' '\n' | awk 'NF'
+}
+
+# Função para exibir dependências opcionais em lista (uma por linha)
+exibir_lista() {
+    coletar_optdeps "${pacote[@]}" | sort -u
+}
+
+# Função para exibir dependências opcionais em coluna (separadas por vírgula)
+exibir_coluna() {
+    coletar_optdeps "${pacote[@]}" | sort -u | paste -sd ' ' -
+    echo
+}
+
+# Verifica qual opção foi passada e executa a função correspondente
+case "$1" in
+    -l)
+        shift
+	pacote=("$@")
+        exibir_lista
+        ;;
+    -c)
+        shift
+	pacote=("$@")
+        exibir_coluna
+        ;;
+    *)
+        echo "Uso: $0 -l <pacote> (lista) | -c <pacote> (coluna)"
+        exit 1
+        ;;
+esac
