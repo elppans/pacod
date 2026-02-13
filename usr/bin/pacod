@@ -1,10 +1,41 @@
 #!/bin/bash
+VERSION="1.0.0"
+CMD="$(basename "$0")"
 
 # Cores
 bold=$(tput bold)
 reset=$(tput sgr0)
 blue=$(tput setaf 4)
 red=$(tput setaf 1)
+# Detecta idioma
+LANG_CHECK="${LC_MESSAGES:-${LANG}}"
+
+if [[ "$LANG_CHECK" == pt* ]]; then
+	IDIOMA="pt"
+else
+	IDIOMA="en"
+fi
+export IDIOMA
+
+if [[ "$IDIOMA" == "pt" ]]; then
+	MSG_DESC="Lista dependências opcionais (optdepends) de pacotes e grupos do Arch Linux"
+	MSG_USO="USO:"
+	MSG_ERRO_ARGS="Erro: argumentos insuficientes."
+	MSG_INVALIDO="Opção inválida."
+	MSG_NAO_ENCONTRADO="Não é pacote nem grupo:"
+else
+	MSG_DESC="Lists optional dependencies (optdepends) of Arch Linux packages and groups"
+	MSG_USO="USAGE:"
+	MSG_ERRO_ARGS="Error: insufficient arguments."
+	MSG_INVALIDO="Invalid option."
+	MSG_NAO_ENCONTRADO="Not a package or group:"
+fi
+
+export MSG_DESC
+export MSG_USO
+export MSG_ERRO_ARGS
+export MSG_INVALIDO
+export MSG_NAO_ENCONTRADO
 
 # Verifica se pacote existe
 pacote_existe() {
@@ -114,21 +145,113 @@ exibir_com_descricao() {
 			expac -S "%o: %d" "$item" -l "\n" 2>/dev/null | awk 'NF'
 			echo
 		else
-			echo "${red}Não é pacote nem grupo:${reset} $item"
+			echo "${red}$MSG_NAO_ENCONTRADO:${reset} $item"
 		fi
 
 	done
 }
 
+mostrar_help() {
+
+	if [[ "$IDIOMA" == "pt" ]]; then
+
+		cat <<EOF
+$CMD - $MSG_DESC
+
+$MSG_USO
+	$CMD [opção] <pacote|grupo> [...]
+
+DESCRIÇÃO:
+	Exibe as dependências opcionais (optdepends) de pacotes individuais
+	ou de todos os pacotes pertencentes a um grupo.
+
+OPÇÕES:
+	-l    Lista simples (uma por linha, sem descrição)
+	-c    Lista em coluna única (separadas por espaço)
+	-d    Exibe com descrição.
+        Para grupos, mostra também quais pacotes utilizam cada optdepend.
+	-h    Mostra esta ajuda e sai
+
+EXEMPLOS:
+	$CMD -l lutris
+	$CMD -d gnome
+	$CMD -c firefox thunderbird
+	$CMD -d lutris gnome
+
+	# Instalar um pacote junto com todas as suas dependências opcionais:
+	pacman --needed -S lutris \$($CMD -c lutris)
+
+	# Instalar múltiplos pacotes junto com seus optdepends:
+	pacman --needed -S lutris \$($CMD -c lutris wine)
+
+OBS:
+	Para grupos, a saída é organizada em formato de árvore,
+	indicando quais pacotes utilizam cada dependência opcional.
+
+EOF
+
+	else
+
+		cat <<EOF
+$CMD - $MSG_DESC
+
+$MSG_USO
+  $CMD [option] <package|group> [...]
+
+DESCRIPTION:
+  Displays optional dependencies (optdepends) for individual packages
+  or for all packages belonging to a group.
+
+OPTIONS:
+  -l    Simple list (one per line, no description)
+  -c    Single line output (space-separated)
+  -d    Show with description.
+        For groups, also displays which packages use each optdepend.
+  -h    Show this help and exit
+
+EXAMPLES:
+  $CMD -l lutris
+  $CMD -d gnome
+  $CMD -c firefox thunderbird
+  $CMD -d lutris gnome
+
+  # Install a package along with all its optional dependencies:
+  pacman --needed -S lutris \$($CMD -c lutris)
+
+  # Install multiple packages along with their optdepends:
+  pacman --needed -S lutris \$($CMD -c lutris wine)
+
+NOTES:
+  For groups, the output is organized in a tree format,
+  indicating which packages use each optional dependency.
+
+EOF
+
+	fi
+}
+
 # =============================
 # Argumentos
 # =============================
+if [[ "$1" == "-v" || "$1" == "--version" ]]; then
+	echo "$CMD version $VERSION"
+	exit 0
+fi
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	mostrar_help
+	exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+	mostrar_help
+	exit 1
+fi
 
 if [[ $# -lt 2 ]]; then
-	echo "Uso:"
-	echo "  $0 -l <pacotes>      (lista)"
-	echo "  $0 -c <pacotes>      (coluna única)"
-	echo "  $0 -d <pacotes>      (com descrição)"
+	echo "$MSG_ERRO_ARGS"
+	echo
+	mostrar_help
 	exit 1
 fi
 
@@ -147,7 +270,7 @@ case "$opcao" in
 	exibir_com_descricao
 	;;
 *)
-	echo "Opção inválida."
+	echo "$MSG_INVALIDO"
 	exit 1
 	;;
 esac
