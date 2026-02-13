@@ -1,0 +1,9 @@
+# Ignorar tudo
+*
+# NÃO ignorar
+!/pkgbuild/*
+!/usr/*
+!/Makefile
+!/README.md
+
+
