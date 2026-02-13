@@ -7,7 +7,7 @@ pkgrel=1
 arch=('any')
 license=('CUSTOM')
 depends=('pacman' 'expac')
-pkgdesc="Pacman Optional Depends Listing"
+pkgdesc="Very simple script for optional list of Pacman dependencies."
 url="https://github.com/elppans/${pkgname}"
 source=("git+${url}.git#branch=main")
 #sha256sums=("ceb19612672b5ddf98a7965f88fb0b0c214c85ba23122135fe9d164590fcad42"
@@ -63,7 +63,8 @@ post_install() {
 	# systemctl daemon-reload
 	cat <<END
 
-O pacote "${pkgname}" foi instalado com sucesso...
+#O pacote "${pkgname}" foi instalado com sucesso.
+The package "${pkgname}" was successfully installed.
 
 END
 
@@ -77,7 +78,7 @@ post_remove() {
 
 	cat <<END
 
-O pacote "${pkgname}" foi removido.
+The package "${pkgname}" has been removed.
 
 END
 }

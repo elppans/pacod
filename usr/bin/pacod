@@ -8,116 +8,116 @@ red=$(tput setaf 1)
 
 # Verifica se pacote existe
 pacote_existe() {
-    pacman -Si "$1" &>/dev/null
+	pacman -Si "$1" &>/dev/null
 }
 
 # Verifica se pacote é tipo grupo
 eh_grupo() {
-    pacman -Sgq "$1" &>/dev/null
+	pacman -Sgq "$1" &>/dev/null
 }
 
 # Coleta optdepends (apenas nomes)
 coletar_optdeps() {
-    for item in "$@"; do
-        if eh_grupo "$item"; then
-            expac -S -g "%o" "$item" -l "\n" 2>/dev/null
-        else
-            expac -S "%o" "$item" -l "\n" 2>/dev/null
-        fi
-    done | awk 'NF'
+	for item in "$@"; do
+		if eh_grupo "$item"; then
+			expac -S -g "%o" "$item" -l "\n" 2>/dev/null
+		else
+			expac -S "%o" "$item" -l "\n" 2>/dev/null
+		fi
+	done | awk 'NF'
 }
 
 # Coleta optdepends com descrição
 coletar_optdeps_desc() {
-    for item in "$@"; do
-        if eh_grupo "$item"; then
-            expac -S -g "%o: %d" "$item" -l "\n" 2>/dev/null
-        else
-            expac -S "%o: %d" "$item" -l "\n" 2>/dev/null
-        fi
-    done | awk 'NF'
+	for item in "$@"; do
+		if eh_grupo "$item"; then
+			expac -S -g "%o: %d" "$item" -l "\n" 2>/dev/null
+		else
+			expac -S "%o: %d" "$item" -l "\n" 2>/dev/null
+		fi
+	done | awk 'NF'
 }
 
 exibir_lista() {
-    coletar_optdeps "${pacotes[@]}" | sort -u
+	coletar_optdeps "${pacotes[@]}" | sort -u
 }
 
 exibir_coluna() {
-    coletar_optdeps "${pacotes[@]}" | sort -u | paste -sd ' ' -
-    echo
+	coletar_optdeps "${pacotes[@]}" | sort -u | paste -sd ' ' -
+	echo
 }
 
 exibir_com_descricao() {
-    for item in "${pacotes[@]}"; do
+	for item in "${pacotes[@]}"; do
 
-        if eh_grupo "$item"; then
-            echo "${bold}${blue}$item (grupo):${reset}"
+		if eh_grupo "$item"; then
+			echo "${bold}${blue}$item (grupo):${reset}"
 
-declare -A mapa
-declare -A descricao
+			declare -A mapa
+			declare -A descricao
 
-            # Itera sobre cada pacote do grupo
-            while read -r pkg; do
-                # Pega optdepends do pacote
-                while read -r opt; do
-                    nome="${opt%%:*}"          # antes dos dois pontos
-                    nome="${nome%% *}"         # remove espaços extras
-                    desc="${opt#*:}"           # depois dos dois pontos
+			# Itera sobre cada pacote do grupo
+			while read -r pkg; do
+				# Pega optdepends do pacote
+				while read -r opt; do
+					nome="${opt%%:*}"  # antes dos dois pontos
+					nome="${nome%% *}" # remove espaços extras
+					desc="${opt#*:}"   # depois dos dois pontos
 
-		    # remove espaços extras no começo
-		    desc="${desc#"${desc%%[![:space:]]*}"}"
+					# remove espaços extras no começo
+					desc="${desc#"${desc%%[![:space:]]*}"}"
 
-                    [[ -z "$nome" ]] && continue
+					[[ -z "$nome" ]] && continue
 
-                # salva descrição (uma vez só)
-                if [[ -z "${descricao[$nome]}" && -n "$desc" ]]; then
-                 descricao["$nome"]="$desc"
-                fi
-                    mapa["$nome"]+="$pkg "
-                done < <(expac -S "%o: %d" "$pkg" -l "\n" 2>/dev/null)
+					# salva descrição (uma vez só)
+					if [[ -z "${descricao[$nome]}" && -n "$desc" ]]; then
+						descricao["$nome"]="$desc"
+					fi
+					mapa["$nome"]+="$pkg "
+				done < <(expac -S "%o: %d" "$pkg" -l "\n" 2>/dev/null)
 
-            done < <(pacman -Sgq "$item")
+			done < <(pacman -Sgq "$item")
 
-# imprime organizado
-printf "%s\n" "${!mapa[@]}" | sort | while IFS= read -r opt; do
-    desc="${descricao[$opt]}"
+			# imprime organizado
+			printf "%s\n" "${!mapa[@]}" | sort | while IFS= read -r opt; do
+				desc="${descricao[$opt]}"
 
-    # imprime nome + descrição apenas se válida
-    if [[ -z "$desc" || "$desc" == "$opt" ]]; then
-        printf "%s\n" "$opt"
-    else
-        printf "%s: %s\n" "$opt" "$desc"
-    fi
+				# imprime nome + descrição apenas se válida
+				if [[ -z "$desc" || "$desc" == "$opt" ]]; then
+					printf "%s\n" "$opt"
+				else
+					printf "%s: %s\n" "$opt" "$desc"
+				fi
 
-    # prepara lista de dependentes ordenada e única
-    mapfile -t pkgs < <(printf "%s\n" ${mapa[$opt]} | tr ' ' '\n' | sort -u)
+				# prepara lista de dependentes ordenada e única
+				mapfile -t pkgs < <(printf "%s\n" "${mapa[$opt]}" | tr ' ' '\n' | sort -u)
 
-    total=${#pkgs[@]}
+				total=${#pkgs[@]}
 
-    for ((i=0; i<total; i++)); do
-        [[ -z "${pkgs[i]}" ]] && continue
+				for ((i = 0; i < total; i++)); do
+					[[ -z "${pkgs[i]}" ]] && continue
 
-        if (( i == total - 1 )); then
-            printf "  └─ %s\n" "${pkgs[i]}"
-        else
-            printf "  ├─ %s\n" "${pkgs[i]}"
-        fi
-    done
+					if ((i == total - 1)); then
+						printf "  └─ %s\n" "${pkgs[i]}"
+					else
+						printf "  ├─ %s\n" "${pkgs[i]}"
+					fi
+				done
 
-    echo
-done
+				echo
+			done
 
-            unset mapa descricao
+			unset mapa descricao
 
-        elif pacote_existe "$item"; then
-            echo "${bold}${blue}$item:${reset}"
-            expac -S "%o: %d" "$item" -l "\n" 2>/dev/null | awk 'NF'
-            echo
-        else
-            echo "${red}Não é pacote nem grupo:${reset} $item"
-        fi
+		elif pacote_existe "$item"; then
+			echo "${bold}${blue}$item:${reset}"
+			expac -S "%o: %d" "$item" -l "\n" 2>/dev/null | awk 'NF'
+			echo
+		else
+			echo "${red}Não é pacote nem grupo:${reset} $item"
+		fi
 
-    done
+	done
 }
 
 # =============================
@@ -125,11 +125,11 @@ done
 # =============================
 
 if [[ $# -lt 2 ]]; then
-    echo "Uso:"
-    echo "  $0 -l <pacotes>      (lista)"
-    echo "  $0 -c <pacotes>      (coluna única)"
-    echo "  $0 -d <pacotes>      (com descrição)"
-    exit 1
+	echo "Uso:"
+	echo "  $0 -l <pacotes>      (lista)"
+	echo "  $0 -c <pacotes>      (coluna única)"
+	echo "  $0 -d <pacotes>      (com descrição)"
+	exit 1
 fi
 
 opcao="$1"
@@ -137,18 +137,17 @@ shift
 pacotes=("$@")
 
 case "$opcao" in
-    -l)
-        exibir_lista
-        ;;
-    -c)
-        exibir_coluna
-        ;;
-    -d)
-        exibir_com_descricao
-        ;;
-    *)
-        echo "Opção inválida."
-        exit 1
-        ;;
+-l)
+	exibir_lista
+	;;
+-c)
+	exibir_coluna
+	;;
+-d)
+	exibir_com_descricao
+	;;
+*)
+	echo "Opção inválida."
+	exit 1
+	;;
 esac
-
