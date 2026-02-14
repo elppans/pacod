@@ -1,9 +1,4 @@
-# Ignorar tudo
-*
-# NÃO ignorar
-!/pkgbuild/*
-!/usr/*
-!/Makefile
-!/README.md
-
-
+pkg/
+src/
+*pkg.tar.xz
+*pkg.tar.zst
