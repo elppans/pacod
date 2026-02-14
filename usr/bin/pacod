@@ -205,10 +205,10 @@ EXEMPLOS:
 	$CMD -d lutris gnome
 
 	# Instalar um pacote junto com todas as suas dependências opcionais:
-	pacman --needed -S \$($CMD -c lutris)
+	pacman --needed -S \$($CMD -cc lutris)
 
 	# Instalar múltiplos pacotes junto com seus optdepends:
-	pacman --needed -S gamemode \$($CMD -c lutris wine)
+	pacman --needed -S gamemode \$($CMD -cc lutris wine)
 
 OBS:
 	Para grupos, a saída é organizada em formato de árvore,
@@ -243,10 +243,10 @@ EXAMPLES:
 	$CMD -d lutris gnome
 
 	# Install a package along with all its optional dependencies:
-	pacman --needed -S \$($CMD -c lutris)
+	pacman --needed -S \$($CMD -cc lutris)
 
 	# Install multiple packages along with their optdepends:
-	pacman --needed -S gamemode \$($CMD -c lutris wine)
+	pacman --needed -S gamemode \$($CMD -cc lutris wine)
 
 NOTES:
 	For groups, the output is organized in a tree format,
