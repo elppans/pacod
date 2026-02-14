@@ -83,77 +83,97 @@ exibir_coluna() {
 	echo
 }
 
+exibir_coluna_com_pacote() {
+    local lista_final=()
+
+    for item in "${pacotes[@]}"; do
+        if eh_grupo "$item"; then
+            # Adiciona os pacotes do grupo à lista
+            mapfile -t membros < <(pacman -Sgq "$item")
+            lista_final+=("${membros[@]}")
+        elif pacote_existe "$item"; then
+            # Adiciona o pacote individual
+            lista_final+=("$item")
+        fi
+    done
+
+    # Coleta as optdeps de todos, remove duplicatas e junta com a lista de pacotes base
+    # O 'sort -u' garante que não instalaremos a mesma dependência duas vezes
+    local optdeps
+    optdeps=$(coletar_optdeps "${pacotes[@]}" | sort -u | tr '\n' ' ')
+
+    # Imprime tudo em uma única linha
+    echo "${lista_final[*]} $optdeps"
+}
+
 exibir_com_descricao() {
-	for item in "${pacotes[@]}"; do
+    for item in "${pacotes[@]}"; do
+        if eh_grupo "$item"; then
+            echo "${bold}${blue}$item (grupo):${reset}"
+            mapfile -t lista_pacotes < <(pacman -Sgq "$item")
+        elif pacote_existe "$item"; then
+            echo "${bold}${blue}$item:${reset}"
+            lista_pacotes=("$item")
+        else
+            echo "${red}$MSG_NAO_ENCONTRADO:${reset} $item"
+            continue
+        fi
 
-		if eh_grupo "$item"; then
-			echo "${bold}${blue}$item (grupo):${reset}"
+        declare -A mapa
+        declare -A descricao
 
-			declare -A mapa
-			declare -A descricao
+        # Itera sobre a lista definida (seja do grupo ou pacote único)
+        for pkg in "${lista_pacotes[@]}"; do
+            # Pega optdepends do pacote
+            while read -r opt; do
+                [[ -z "$opt" ]] && continue
+                
+                nome="${opt%%:*}"  # antes dos dois pontos
+                nome="${nome%% *}" # remove espaços extras
+                desc="${opt#*:}"   # depois dos dois pontos
 
-			# Itera sobre cada pacote do grupo
-			while read -r pkg; do
-				# Pega optdepends do pacote
-				while read -r opt; do
-					nome="${opt%%:*}"  # antes dos dois pontos
-					nome="${nome%% *}" # remove espaços extras
-					desc="${opt#*:}"   # depois dos dois pontos
+                # remove espaços extras no começo da descrição
+                desc="${desc#"${desc%%[![:space:]]*}"}"
 
-					# remove espaços extras no começo
-					desc="${desc#"${desc%%[![:space:]]*}"}"
+                [[ -z "$nome" ]] && continue
 
-					[[ -z "$nome" ]] && continue
+                # Salva descrição (prioriza a primeira encontrada ou a que não seja vazia)
+                if [[ -z "${descricao[$nome]}" && -n "$desc" ]]; then
+                    descricao["$nome"]="$desc"
+                fi
+                mapa["$nome"]+="$pkg "
+            done < <(expac -S "%o: %d" "$pkg" -l "\n" 2>/dev/null)
+        done
 
-					# salva descrição (uma vez só)
-					if [[ -z "${descricao[$nome]}" && -n "$desc" ]]; then
-						descricao["$nome"]="$desc"
-					fi
-					mapa["$nome"]+="$pkg "
-				done < <(expac -S "%o: %d" "$pkg" -l "\n" 2>/dev/null)
+        # Imprime organizado com a árvore
+        if [[ ${#mapa[@]} -gt 0 ]]; then
+            printf "%s\n" "${!mapa[@]}" | sort | while IFS= read -r opt; do
+                desc="${descricao[$opt]}"
 
-			done < <(pacman -Sgq "$item")
+                if [[ -z "$desc" || "$desc" == "$opt" ]]; then
+                    printf "%s\n" "$opt"
+                else
+                    printf "%s: %s\n" "$opt" "$desc"
+                fi
 
-			# imprime organizado
-			printf "%s\n" "${!mapa[@]}" | sort | while IFS= read -r opt; do
-				desc="${descricao[$opt]}"
+                # Prepara lista de dependentes
+                mapfile -t pkgs < <(printf "%s\n" "${mapa[$opt]}" | tr ' ' '\n' | sort -u)
+                total=${#pkgs[@]}
 
-				# imprime nome + descrição apenas se válida
-				if [[ -z "$desc" || "$desc" == "$opt" ]]; then
-					printf "%s\n" "$opt"
-				else
-					printf "%s: %s\n" "$opt" "$desc"
-				fi
+                for ((i = 0; i < total; i++)); do
+                    [[ -z "${pkgs[i]}" ]] && continue
+                    if ((i == total - 1)); then
+                        printf "  └─ %s\n" "${pkgs[i]}"
+                    else
+                        printf "  ├─ %s\n" "${pkgs[i]}"
+                    fi
+                done
+                echo
+            done
+        fi
 
-				# prepara lista de dependentes ordenada e única
-				mapfile -t pkgs < <(printf "%s\n" "${mapa[$opt]}" | tr ' ' '\n' | sort -u)
-
-				total=${#pkgs[@]}
-
-				for ((i = 0; i < total; i++)); do
-					[[ -z "${pkgs[i]}" ]] && continue
-
-					if ((i == total - 1)); then
-						printf "  └─ %s\n" "${pkgs[i]}"
-					else
-						printf "  ├─ %s\n" "${pkgs[i]}"
-					fi
-				done
-
-				echo
-			done
-
-			unset mapa descricao
-
-		elif pacote_existe "$item"; then
-			echo "${bold}${blue}$item:${reset}"
-			expac -S "%o: %d" "$item" -l "\n" 2>/dev/null | awk 'NF'
-			echo
-		else
-			echo "${red}$MSG_NAO_ENCONTRADO:${reset} $item"
-		fi
-
-	done
+        unset mapa descricao lista_pacotes
+    done
 }
 
 mostrar_help() {
@@ -172,7 +192,8 @@ DESCRIÇÃO:
 
 OPÇÕES:
 	-l    Lista simples (uma por linha, sem descrição)
-	-c    Lista em coluna única (separadas por espaço)
+	-c    Lista em coluna única (apenas as optdepends, separadas por espaço)
+	-cc   Lista em coluna única (pacote original + optdepends, separadas por espaço)
 	-d    Exibe com descrição.
         Para grupos, mostra também quais pacotes utilizam cada optdepend.
 	-h    Mostra esta ajuda e sai
@@ -184,10 +205,10 @@ EXEMPLOS:
 	$CMD -d lutris gnome
 
 	# Instalar um pacote junto com todas as suas dependências opcionais:
-	pacman --needed -S lutris \$($CMD -c lutris)
+	pacman --needed -S \$($CMD -c lutris)
 
 	# Instalar múltiplos pacotes junto com seus optdepends:
-	pacman --needed -S lutris \$($CMD -c lutris wine)
+	pacman --needed -S gamemode \$($CMD -c lutris wine)
 
 OBS:
 	Para grupos, a saída é organizada em formato de árvore,
@@ -201,34 +222,35 @@ EOF
 $CMD - $MSG_DESC
 
 $MSG_USO
-  $CMD [option] <package|group> [...]
+	$CMD [option] <package|group> [...]
 
 DESCRIPTION:
-  Displays optional dependencies (optdepends) for individual packages
-  or for all packages belonging to a group.
+	Displays optional dependencies (optdepends) for individual packages
+	or for all packages belonging to a group.
 
 OPTIONS:
-  -l    Simple list (one per line, no description)
-  -c    Single line output (space-separated)
-  -d    Show with description.
+	-l    Simple list (one per line, no description)
+	-c    Single line output (optdepends only, space-separated)
+	-cc   Single line output (original package + optdepends, space-separated)
+	-d    Show with description.
         For groups, also displays which packages use each optdepend.
-  -h    Show this help and exit
+	-h    Show this help and exit
 
 EXAMPLES:
-  $CMD -l lutris
-  $CMD -d gnome
-  $CMD -c firefox thunderbird
-  $CMD -d lutris gnome
+	$CMD -l lutris
+	$CMD -d gnome
+	$CMD -c firefox thunderbird
+	$CMD -d lutris gnome
 
-  # Install a package along with all its optional dependencies:
-  pacman --needed -S lutris \$($CMD -c lutris)
+	# Install a package along with all its optional dependencies:
+	pacman --needed -S \$($CMD -c lutris)
 
-  # Install multiple packages along with their optdepends:
-  pacman --needed -S lutris \$($CMD -c lutris wine)
+	# Install multiple packages along with their optdepends:
+	pacman --needed -S gamemode \$($CMD -c lutris wine)
 
 NOTES:
-  For groups, the output is organized in a tree format,
-  indicating which packages use each optional dependency.
+	For groups, the output is organized in a tree format,
+	indicating which packages use each optional dependency.
 
 EOF
 
@@ -271,6 +293,9 @@ case "$opcao" in
 -c)
 	exibir_coluna
 	;;
+-cc)
+    exibir_coluna_com_pacote
+    ;;
 -d)
 	exibir_com_descricao
 	;;
